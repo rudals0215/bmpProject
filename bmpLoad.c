@@ -89,8 +89,8 @@ int main(){
         // Thread Affinity Check
         pthread_getaffinity_np(t_id[i], sizeof(cpuset), &cpuset);
         for (int j = 0; j < 4; j++)
-               if (CPU_ISSET(j, &cpuset))
-                   printf("\t CPU %d\n", j);
+            if (CPU_ISSET(j, &cpuset))
+                printf("\t CPU %d\n", j);
     }
 
     return 0;
