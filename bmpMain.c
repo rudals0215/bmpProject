@@ -1,6 +1,16 @@
-
+#define _GNU_SOURCE 
 #include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <inttypes.h>
+#include <pthread.h>
+#include <errno.h>
 #include "bmpStruct.h"
+
+#define THR_SIZE 4
+
+void divideSection(int index[][4], int width, int height, int numSection);
+void* func(void *arg);
 
 #define BUF_MAX 100
 #define PIXEL_SIZE 3
@@ -52,25 +62,87 @@ int main(){
         }
     }
 
-    fpNew = fopen("sample_new.bmp", "w");
 
-    // Modify
-    for(int x=50;x<100;x++){
-        for(int y=50;y<300;y++){
-            img[y][x].rgbtBlue = 0;
-            img[y][x].rgbtGreen = 0;
-            img[y][x].rgbtRed = 255;
+    // Modify through 4 threads
+    pthread_t t_id[THR_SIZE];
+    cpu_set_t cpuset;
+
+    int index[THR_SIZE][4];
+
+    divideSection(index, width, height, THR_SIZE);
+
+    int light[] = {0, 25, 50, 75};
+    
+    THREADARGS* param = (THREADARGS*) malloc(sizeof(THREADARGS));
+
+    for(int i=0;i<THR_SIZE;i++){
+        param->startX = index[i][0];
+        param->startY = index[i][1];
+        param->endX = index[i][2];
+        param->endY = index[i][3];
+        param->img = img;
+        param->light = light[i];
+
+	    if (pthread_create(&t_id[i], NULL, func, (void*)param) != 0){
+            puts("pthread_create() error");
+            return -1;
+	    }
+	    if(pthread_join(t_id[i], NULL)!=0){
+            puts("pthread_join() error");
+            return -1;
         }
-    }   
+
+        CPU_ZERO(&cpuset);
+        CPU_SET(i, &cpuset);
+        pthread_setaffinity_np(t_id[i], sizeof(cpuset), &cpuset);
+
+        // Thread Affinity Check
+        pthread_getaffinity_np(t_id[i], sizeof(cpuset), &cpuset);
+        for (int j = 0; j < 4; j++)
+            if (CPU_ISSET(j, &cpuset))
+                printf("\t CPU %d\n", j);
+    }
+
     
     // SAVED
+    
+    fpNew = fopen("sample_new.bmp", "w");
     fwrite(&fh, sizeof(unsigned char), sizeof(BITMAPFILEHEADER), fpNew);
     fwrite(&ih, sizeof(unsigned char), sizeof(BITMAPINFOHEADER), fpNew);
     fwrite(&img, sizeof(unsigned char), sizeof(RGBTRIPLE)*width*height, fpNew);
-    fclose(fp);
-    fclose(fpNew);
 
+    fclose(fpNew);
+    fclose(fp);
     return 0;
 }
 
 
+void* func(void *arg){
+    THREADARGS* args = (THREADARGS*) arg;
+    printf("In Thread, [%d, %d]->[%d, %d] img: %p, light: %d\n",args->startX,args->startY,args->endX,args->endY, args->img, args->light);
+
+    for(int x=args->startX; x<=args->endX; x++){
+        for(int y=args->startY; y<=args->endY; y++){
+            Change Light
+            args->img[y][x].rgbtBlue *= args->light/100;
+            args->img[y][x].rgbtGreen *= args->light/100;
+            args->img[y][x].rgbtRed *= args->light/100;
+        }
+    }
+    
+	return NULL;
+}
+
+void divideSection(int index[][4], int width, int height, int numSection){
+    printf("divide Section %d\n", numSection);
+    printf("width X height %d X %d\n", width, height);
+    for(int i=0 ; i < numSection ; i++){
+        index[i][0] = width / THR_SIZE * i;
+        index[i][1] = height;
+        index[i][2] = width / THR_SIZE * (i + 1);
+        index[i][3] = height;
+        printf("Section %d: [%d,%d]-> [%d,%d]\n", i, index[i][0],index[i][1],index[i][2],index[i][3]);
+    }    
+}
+
+    
