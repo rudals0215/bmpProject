@@ -1,5 +1,5 @@
 # bmpProject
-## Multi-thread 기반 이미지 파일 (BMP) 처리 프로그램 작성  
+- Multi-thread 기반 이미지 파일 (BMP) 처리 프로그램 작성  
 - BMP 파일 로드 (mmap() 활용)  
 - CPU 코어 개수 만큼의 N개의 Thread 생성  
 - 각 Thread를 CPU affinity를 이용하여 각 CPU 코어에 할당  
