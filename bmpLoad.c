@@ -1,7 +1,12 @@
+
+#define _GNU_SOURCE 
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <inttypes.h>
+#include <pthread.h>
+#include <errno.h>
+
 #define BUF_MAX 100
 #define THR_SIZE 4
 
@@ -63,11 +68,11 @@ int main(){
     }
 
 	pthread_t t_id[THR_SIZE];
+    cpu_set_t cpuset;
 
     int index[THR_SIZE][4];
     divideSection(index, ih.width, ih.height, THR_SIZE);
     for(int i=0;i<THR_SIZE;i++){
-        printf("pthread\n");
 	    if (pthread_create(&t_id[i], NULL, func, (void**)&index[i]) != 0){
             puts("pthread_create() error");
             return -1;
@@ -76,7 +81,16 @@ int main(){
             puts("pthread_join() error");
             return -1;
         }
-        printf("pthread\n");
+
+        CPU_ZERO(&cpuset);
+        CPU_SET(i, &cpuset);
+        pthread_setaffinity_np(t_id[i], sizeof(cpuset), &cpuset);
+
+        // Thread Affinity Check
+        pthread_getaffinity_np(t_id[i], sizeof(cpuset), &cpuset);
+        for (int j = 0; j < 4; j++)
+               if (CPU_ISSET(j, &cpuset))
+                   printf("\t CPU %d\n", j);
     }
 
     return 0;
@@ -90,6 +104,7 @@ void* func(void *arg){
 
     for(int x=startX; x<=endX; x++)
         for(int y=startY; y<=endY; y++)
+        ; // Change Color
             printf("change Color\n");
     
 	return NULL;
