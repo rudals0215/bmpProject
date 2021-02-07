@@ -41,6 +41,6 @@ typedef struct _THREADARGS
     int startY;
 	int endX;
     int endY;
-    RGBTRIPLE** img;
+    RGBTRIPLE (*img)[1440];
     int light;
 } THREADARGS;

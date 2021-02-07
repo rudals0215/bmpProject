@@ -83,6 +83,8 @@ int main(){
         param->img = img;
         param->light = light[i];
 
+        printf("In main, img: %p %u\n",param->img, param->img[0][0].rgbtBlue);
+
 	    if (pthread_create(&t_id[i], NULL, func, (void*)param) != 0){
             puts("pthread_create() error");
             return -1;
@@ -121,15 +123,22 @@ void* func(void *arg){
     THREADARGS* args = (THREADARGS*) arg;
     printf("In Thread, [%d, %d]->[%d, %d] img: %p, light: %d\n",args->startX,args->startY,args->endX,args->endY, args->img, args->light);
 
-    for(int x=args->startX; x<=args->endX; x++){
-        for(int y=args->startY; y<=args->endY; y++){
-            Change Light
-            args->img[y][x].rgbtBlue *= args->light/100;
-            args->img[y][x].rgbtGreen *= args->light/100;
-            args->img[y][x].rgbtRed *= args->light/100;
+    int width = 1440;
+    RGBTRIPLE (*img)[1440] = args->img;
+    // printf("img: %p *img: %p\n",img, *img);
+    printf("before BGR %u %u %u\n",img[args->startY][args->startX].rgbtBlue, img[args->startY][args->startX].rgbtGreen, img[args->startY][args->startX].rgbtRed);
+
+    for(int x=args->startX; x<args->endX; x++){
+        for(int y=args->startY; y<args->endY; y++){
+            // Change Light
+            // printf("change light %d %d\n",x,y);
+            img[y][x].rgbtBlue = img[y][x].rgbtBlue * args->light / 100;
+            img[y][x].rgbtGreen = img[y][x].rgbtBlue * args->light / 100;
+            img[y][x].rgbtRed = img[y][x].rgbtBlue * args->light / 100;
         }
     }
-    
+    printf("after BGR %u %u %u\n",img[args->startY][args->startX].rgbtBlue, img[args->startY][args->startX].rgbtGreen, img[args->startY][args->startX].rgbtRed);
+
 	return NULL;
 }
 
@@ -138,7 +147,7 @@ void divideSection(int index[][4], int width, int height, int numSection){
     printf("width X height %d X %d\n", width, height);
     for(int i=0 ; i < numSection ; i++){
         index[i][0] = width / THR_SIZE * i;
-        index[i][1] = height;
+        index[i][1] = 0;
         index[i][2] = width / THR_SIZE * (i + 1);
         index[i][3] = height;
         printf("Section %d: [%d,%d]-> [%d,%d]\n", i, index[i][0],index[i][1],index[i][2],index[i][3]);
