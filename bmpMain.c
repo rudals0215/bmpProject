@@ -133,8 +133,8 @@ void* func(void *arg){
             // Change Light
             // printf("change light %d %d\n",x,y);
             img[y][x].rgbtBlue = img[y][x].rgbtBlue * args->light / 100;
-            img[y][x].rgbtGreen = img[y][x].rgbtBlue * args->light / 100;
-            img[y][x].rgbtRed = img[y][x].rgbtBlue * args->light / 100;
+            img[y][x].rgbtGreen = img[y][x].rgbtGreen * args->light / 100;
+            img[y][x].rgbtRed = img[y][x].rgbtRed * args->light / 100;
         }
     }
     printf("after BGR %u %u %u\n",img[args->startY][args->startX].rgbtBlue, img[args->startY][args->startX].rgbtGreen, img[args->startY][args->startX].rgbtRed);
