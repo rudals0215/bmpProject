@@ -6,9 +6,8 @@
 #include <pthread.h>
 #include <errno.h>
 #include <string.h>
+#include <time.h>
 #include "bmpStruct.h"
-
-#define THR_SIZE 4
 
 void divideSection(int index[][4], int width, int height, int numSection);
 void* func(void *arg);
@@ -16,7 +15,12 @@ void* func(void *arg);
 #define BUF_MAX 100
 #define PIXEL_SIZE 3
 
+int THR_SIZE = 1;
+
 int main(int argc, char *argv[]){
+    clock_t start, end;
+    float res;
+
     FILE *fp;                       // bitmap image file pointer
     FILE *fpNew;                    // new bitmap image file pointer
     char filename[BUF_MAX];         // bitmap image file name
@@ -27,14 +31,15 @@ int main(int argc, char *argv[]){
     BITMAPFILEHEADER fh;   // file header                                                                                                                                                                                                                        
     BITMAPINFOHEADER ih;   // info header
 
-	if (argc != 3) {
-		printf("Usage : %s <bitmap file> <new file>\n", argv[0]); 
+	if (argc != 4) {
+		printf("Usage : %s <bitmap file> <new file> <Num of Thread>\n", argv[0]); 
 		exit(1);	
 	}
 
     // File Load
     strcpy(filename, argv[1]);
     strcpy(newfilename, argv[2]);
+    THR_SIZE = atoi(argv[3]);
     
     fp = fopen(filename,"r");
 
@@ -78,6 +83,8 @@ int main(int argc, char *argv[]){
 
 
     divideSection(index, width, height, THR_SIZE);
+
+    start = clock();
     for(int i=0;i<THR_SIZE;i++){
         printf("## Thread %d ##\n",i);
         param->startX = index[i][0]; // startX
@@ -109,6 +116,12 @@ int main(int argc, char *argv[]){
             if (CPU_ISSET(j, &cpuset))
                 printf("\t CPU %d\n", j);
     }
+    end = clock();    
+	res = (float)(end - start)/CLOCKS_PER_SEC;
+    printf("Executed time: %f\n", res);
+    FILE * time = fopen("time.txt","at");
+    fprintf(time, "Thread: %d, Time: %f\n", THR_SIZE, res);
+    fclose(time);
 
     // Save the new img into a new file
     fpNew = fopen(newfilename, "w");
