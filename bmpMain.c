@@ -15,85 +15,89 @@ void* func(void *arg);
 #define BUF_MAX 100
 #define PIXEL_SIZE 3
 
-int main(){
-    FILE *fp;                    // 비트맵 파일 포인터
-    FILE *fpNew;                    // 텍스트 파일 포인터
-
-    unsigned char *image;
+int main(int argc, char *argv[]){
+    FILE *fp;                       // bitmap image file pointer
+    FILE *fpNew;                    // new bitmap image file pointer
+    char filename[BUF_MAX];         // bitmap image file name
+    char newfilename[BUF_MAX];      // new bitmap image file name
+    
     int size, width, height, padding;
-    char ascii[] = { '#', '#', '@', '%', '=', '+', '*', ':', '-', '.', ' ' };    // 11개
-
-    char buf[BUF_MAX];
                                                                                                                                                                                                                              
-    BITMAPFILEHEADER fh;                                                                                                                                                                                                                           
-    BITMAPINFOHEADER ih;   
-    fp = fopen("sample.bmp","r");
+    BITMAPFILEHEADER fh;   // file header                                                                                                                                                                                                                        
+    BITMAPINFOHEADER ih;   // info header
+
+	if (argc != 3) {
+		printf("Usage : %s <bitmap file> <new file>\n", argv[0]); 
+		exit(1);	
+	}
+
+    // File Load
+    strcpy(filename, argv[1]);
+    strcpy(newfilename, argv[2]);
+    
+    fp = fopen(filename,"r");
 
     fread(&fh, sizeof(unsigned char), sizeof(BITMAPFILEHEADER), fp);
     fread(&ih, sizeof(unsigned char), sizeof(BITMAPINFOHEADER), fp);
 
+    // Header
     printf("### Header ###\n");
     printf("bfType = %c, bfSize = %u, bfOffBits = %u\n", fh.bfType, fh.bfSize, fh.bfOffBits);                                                                         
     printf("w = %d, h = %d\n", ih.biWidth, ih.biHeight);
     printf("biBitCount = %u\n", ih.biBitCount);
 
-    size = ih.biSizeImage;    // 픽셀 데이터 크기
-    width = ih.biWidth;       // 비트맵 이미지의 가로 크기
-    height = ih.biHeight;     // 비트맵 이미지의 세로 크기
+    size = ih.biSizeImage;    // Pixel data size
+    width = ih.biWidth;       // image width
+    height = ih.biHeight;     // image height
     padding = 0;
 
-    if (size == 0)    // 픽셀 데이터 크기가 0이라면
-    {
-        // 이미지의 가로 크기 * 픽셀 크기에 남는 공간을 더해주면 완전한 가로 한 줄 크기가 나옴
-        // 여기에 이미지의 세로 크기를 곱해주면 픽셀 데이터의 크기를 구할 수 있음
+    if (size == 0)
         size = (width * PIXEL_SIZE + padding) * height;
-    }
 
     // IMG data
     RGBTRIPLE img[height][width];
     fread(img, sizeof(unsigned char), sizeof(RGBTRIPLE)*width*height, fp);
 
     printf("### Image ###\n");
-    for(int x=0 ; x<width ; x++){
-        for(int y=0 ; y<height ; y++){
-            // if(x>1430 && y>1070)
+    for(int x = 0 ; x < width ; x++){
+        for(int y = 0 ; y < height ; y++){
             if(x<5 && y<5)
             printf("img[%d,%d] BGR : %u %u %u\n",y,x,img[y][x].rgbtBlue,img[y][x].rgbtGreen,img[y][x].rgbtRed);
         }
     }
 
 
-    // Modify through 4 threads
+    // Modify through threads
     pthread_t t_id[THR_SIZE];
     cpu_set_t cpuset;
 
-    int index[THR_SIZE][4];
-
-    divideSection(index, width, height, THR_SIZE);
-
-    int light[] = {50, 75, 25, 100};
-    
+    int index[THR_SIZE][4]; // To divide sections
+    int light[] = {50, 75, 25, 100}; // percentage to change light of bitmap images
     THREADARGS* param = (THREADARGS*) malloc(sizeof(THREADARGS));
 
-    for(int i=0;i<THR_SIZE;i++){
-        param->startX = index[i][0];
-        param->startY = index[i][1];
-        param->endX = index[i][2];
-        param->endY = index[i][3];
-        param->img = img;
-        param->light = light[i];
 
-        printf("In main, img: %p %u\n",param->img, param->img[0][0].rgbtBlue);
+    divideSection(index, width, height, THR_SIZE);
+    for(int i=0;i<THR_SIZE;i++){
+        printf("## Thread %d ##\n",i);
+        param->startX = index[i][0]; // startX
+        param->startY = index[i][1]; // startY
+        param->endX = index[i][2];   // endX
+        param->endY = index[i][3];   // endY
+        param->img = img;            // img
+        param->light = light[i];     // light
+
+        // printf("In main, img: %p %u\n",param->img, param->img[0][0].rgbtBlue);
 
 	    if (pthread_create(&t_id[i], NULL, func, (void*)param) != 0){
-            puts("pthread_create() error");
-            return -1;
+            printf("pthread_create() error");
+            exit(1);
 	    }
 	    if(pthread_join(t_id[i], NULL)!=0){
-            puts("pthread_join() error");
-            return -1;
+            printf("pthread_join() error");
+            exit(1);
         }
 
+        // set the thread affinity
         CPU_ZERO(&cpuset);
         CPU_SET(i, &cpuset);
         pthread_setaffinity_np(t_id[i], sizeof(cpuset), &cpuset);
@@ -105,9 +109,7 @@ int main(){
                 printf("\t CPU %d\n", j);
     }
 
-    
-    // SAVED
-    
+    // Save the new img into a new file
     fpNew = fopen("sample_new.bmp", "w");
     fwrite(&fh, sizeof(unsigned char), sizeof(BITMAPFILEHEADER), fpNew);
     fwrite(&ih, sizeof(unsigned char), sizeof(BITMAPINFOHEADER), fpNew);
@@ -138,7 +140,6 @@ void* func(void *arg){
         }
     }
     printf("after BGR %u %u %u\n",img[args->startY][args->startX].rgbtBlue, img[args->startY][args->startX].rgbtGreen, img[args->startY][args->startX].rgbtRed);
-
 	return NULL;
 }
 
