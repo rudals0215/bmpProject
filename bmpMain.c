@@ -5,6 +5,7 @@
 #include <inttypes.h>
 #include <pthread.h>
 #include <errno.h>
+#include <string.h>
 #include "bmpStruct.h"
 
 #define THR_SIZE 4
@@ -110,7 +111,7 @@ int main(int argc, char *argv[]){
     }
 
     // Save the new img into a new file
-    fpNew = fopen("sample_new.bmp", "w");
+    fpNew = fopen(newfilename, "w");
     fwrite(&fh, sizeof(unsigned char), sizeof(BITMAPFILEHEADER), fpNew);
     fwrite(&ih, sizeof(unsigned char), sizeof(BITMAPINFOHEADER), fpNew);
     fwrite(&img, sizeof(unsigned char), sizeof(RGBTRIPLE)*width*height, fpNew);
