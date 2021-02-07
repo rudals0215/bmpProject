@@ -71,7 +71,7 @@ int main(){
 
     divideSection(index, width, height, THR_SIZE);
 
-    int light[] = {0, 25, 50, 75};
+    int light[] = {50, 75, 25, 100};
     
     THREADARGS* param = (THREADARGS*) malloc(sizeof(THREADARGS));
 
