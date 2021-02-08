@@ -38,7 +38,8 @@ int main(){
         // 여기에 이미지의 세로 크기를 곱해주면 픽셀 데이터의 크기를 구할 수 있음
         size = (width * PIXEL_SIZE + padding) * height;
     }
-
+    printf("size : %d, width : %d, height : %d, padding : %d\n", size, width, height, padding);
+    
     // IMG data
     RGBTRIPLE img[height][width];
     fread(img, sizeof(unsigned char), sizeof(RGBTRIPLE)*width*height, fp);
