@@ -1,5 +1,5 @@
 /*
-    mmap 함수를 1차원 배열을 이용하여 구현
+    mmap 1차원 배열을 이용하여 구현
 */
 
 #include <sys/types.h>
