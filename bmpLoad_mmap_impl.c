@@ -16,9 +16,6 @@ int main(){
     int fdNew;
     struct stat statbuf;
     int size, width, height, padding;
-                                                                                                                                                                                                                             
-    BITMAPFILEHEADER * fh;                                                                                                                                                                                                                           
-    BITMAPINFOHEADER * ih;   
 
     fd = open("sample.bmp", O_RDONLY);
     if(fd == -1){
@@ -38,22 +35,23 @@ int main(){
         exit(1);
     }
 
-    BITMAPHEADER * bmh;
-    bmh= (BITMAPHEADER *)malloc(sizeof(statbuf.st_size));
-    if((bmh = (BITMAPHEADER *)mmap(0, sizeof(statbuf.st_size), PROT_READ, MAP_SHARED, fd, (off_t) 0)) == -1){
-        perror("bitmap error");
-        exit(1);
-    }
-    write(fdNew, bmh, statbuf.st_size);
+    BITMAPFILEHEADER fh;                                                                                                                                                                                                                           
+    BITMAPINFOHEADER ih;   
+
+    read(fd, &fh, sizeof(BITMAPFILEHEADER));
+    read(fd, &ih, sizeof(BITMAPINFOHEADER));
+
+    write(fdNew, &fh, sizeof(BITMAPFILEHEADER));
+    write(fdNew, &ih, sizeof(BITMAPINFOHEADER));
 
     printf("### Header ###\n");
-    printf("bfType = %c, bfSize = %u, bfOffBits = %u\n", bmh->fh.bfType, bmh->fh.bfSize, bmh->fh.bfOffBits);                                                                         
-    printf("w = %d, h = %d\n", bmh->ih.biWidth, bmh->ih.biHeight);
-    printf("biBitCount = %u\n", bmh->ih.biBitCount);
-        
-    size = bmh->ih.biSizeImage;    // 픽셀 데이터 크기
-    width = bmh->ih.biWidth;       // 비트맵 이미지의 가로 크기
-    height = bmh->ih.biHeight;     // 비트맵 이미지의 세로 크기
+    printf("bfType = %c, bfSize = %u, bfOffBits = %u\n", fh.bfType, fh.bfSize, fh.bfOffBits);                                                                         
+    printf("w = %d, h = %d\n", ih.biWidth, ih.biHeight);
+    printf("biBitCount = %u\n", ih.biBitCount);
+
+    size = ih.biSizeImage;    // 픽셀 데이터 크기
+    width = ih.biWidth;       // 비트맵 이미지의 가로 크기
+    height = ih.biHeight;     // 비트맵 이미지의 세로 크기
     padding = 0;
 
     if (size == 0)    // 픽셀 데이터 크기가 0이라면
@@ -64,31 +62,35 @@ int main(){
     }
     printf("size : %d, width : %d, height : %d, padding : %d\n", size, width, height, padding);
 
+    RGBTRIPLE * bmh;
+    // bmh= (RGBTRIPLE **)malloc(sizeof(RGBTRIPLE *) * height);
+    // for(int i=0;i<height;i++){
+    //     bmh[i] = (RGBTRIPLE *)malloc(sizeof(RGBTRIPLE) * width);
+    // }
+    off_t offset, pa_offset;
+    offset = sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER);
+    pa_offset = offset & ~(sysconf(_SC_PAGE_SIZE) - 1); /* offset for mmap() must be page aligned */
+    if((bmh = (RGBTRIPLE *)mmap(0, statbuf.st_size - offset, PROT_READ , MAP_SHARED, fd, (off_t) pa_offset)) == -1){
+        perror("bitmap error");
+        exit(1);
+    }
+
+    write(fdNew, bmh, statbuf.st_size - offset);
+
     
     close(fd);
     close(fdNew);
     
     // IMG data
-    // RGBTRIPLE img[height][width];
-    // fread(img, sizeof(unsigned char), sizeof(RGBTRIPLE)*width*height, fp);
-
     // printf("### Image ###\n");
-    // for(int x=0 ; x<width ; x++){
-    //     for(int y=0 ; y<height ; y++){
+    // for(int x=0 ; x<height ; x++){
+    //     for(int y=0 ; y<width ; y++){
     //         // if(x>1430 && y>1070)
     //         if(x<5 && y<5)
-    //         printf("img[%d,%d] BGR : %u %u %u\n",y,x,img[y][x].rgbtBlue,img[y][x].rgbtGreen,img[y][x].rgbtRed);
+    //             printf("bmh[%d,%d] BGR : %u %u %u\n",x,y,bmh[x][y].rgbtBlue,bmh[x][y].rgbtGreen,bmh[x][y].rgbtRed);
     //     }
     // }
 
-    // // Modify
-    // for(int x=50;x<100;x++){
-    //     for(int y=50;y<300;y++){
-    //         img[y][x].rgbtBlue = 0;
-    //         img[y][x].rgbtGreen = 0;
-    //         img[y][x].rgbtRed = 255;
-    //     }
-    // }   
 
     return 0;
 }

@@ -36,7 +36,7 @@ typedef struct _BITMAP
 {
     BITMAPFILEHEADER fh; // (14)
     BITMAPINFOHEADER ih; // (40)
-    RGBTRIPLE rgb[360][380]; // (3)
+    RGBTRIPLE rgb[5000000]; // (3)
 } BITMAPHEADER; 
 
 #pragma pack(pop)

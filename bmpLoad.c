@@ -45,13 +45,20 @@ int main(){
     fread(img, sizeof(unsigned char), sizeof(RGBTRIPLE)*width*height, fp);
 
     printf("### Image ###\n");
-    for(int x=0 ; x<width ; x++){
-        for(int y=0 ; y<height ; y++){
+    for(int x=0 ; x<height ; x++){
+        for(int y=0 ; y<width ; y++){
             // if(x>1430 && y>1070)
             if(x<5 && y<5)
-            printf("img[%d,%d] BGR : %u %u %u\n",y,x,img[y][x].rgbtBlue,img[y][x].rgbtGreen,img[y][x].rgbtRed);
+            printf("img[%d,%d] BGR : %u %u %u\n", x, y, img[x][y].rgbtBlue, img[x][y].rgbtGreen, img[x][y].rgbtRed);
         }
     }
+    // for(int x=0 ; x<width ; x++){
+    //     for(int y=0 ; y<height ; y++){
+    //         // if(x>1430 && y>1070)
+    //         if(x<5 && y<5)
+    //         printf("img[%d,%d] BGR : %u %u %u\n",y,x,img[y][x].rgbtBlue,img[y][x].rgbtGreen,img[y][x].rgbtRed);
+    //     }
+    // }
 
     fpNew = fopen("sample_new.bmp", "w");
 
