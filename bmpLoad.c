@@ -38,19 +38,27 @@ int main(){
         // 여기에 이미지의 세로 크기를 곱해주면 픽셀 데이터의 크기를 구할 수 있음
         size = (width * PIXEL_SIZE + padding) * height;
     }
-
+    printf("size : %d, width : %d, height : %d, padding : %d\n", size, width, height, padding);
+    
     // IMG data
     RGBTRIPLE img[height][width];
     fread(img, sizeof(unsigned char), sizeof(RGBTRIPLE)*width*height, fp);
 
     printf("### Image ###\n");
-    for(int x=0 ; x<width ; x++){
-        for(int y=0 ; y<height ; y++){
+    for(int x=0 ; x<height ; x++){
+        for(int y=0 ; y<width ; y++){
             // if(x>1430 && y>1070)
             if(x<5 && y<5)
-            printf("img[%d,%d] BGR : %u %u %u\n",y,x,img[y][x].rgbtBlue,img[y][x].rgbtGreen,img[y][x].rgbtRed);
+            printf("img[%d,%d] BGR : %u %u %u\n", x, y, img[x][y].rgbtBlue, img[x][y].rgbtGreen, img[x][y].rgbtRed);
         }
     }
+    // for(int x=0 ; x<width ; x++){
+    //     for(int y=0 ; y<height ; y++){
+    //         // if(x>1430 && y>1070)
+    //         if(x<5 && y<5)
+    //         printf("img[%d,%d] BGR : %u %u %u\n",y,x,img[y][x].rgbtBlue,img[y][x].rgbtGreen,img[y][x].rgbtRed);
+    //     }
+    // }
 
     fpNew = fopen("sample_new.bmp", "w");
 
