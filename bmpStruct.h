@@ -37,10 +37,10 @@ typedef struct _RGBTRIPLE            // 24비트 비트맵 이미지의 픽셀 �
 
 typedef struct _THREADARGS
 {
-    int startX;
-    int startY;
-	int endX;
-    int endY;
+    int start;
+    int end;
+    int width;
     RGBTRIPLE* img;
     int light;
+    int numLight;
 } THREADARGS;
