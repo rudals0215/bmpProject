@@ -82,3 +82,4 @@ Thread: 4, Time: 0.030000
 Thread: 4, Time: 0.030000
 Thread: 4, Time: 0.040000
 Thread: 4, Time: 0.040000
+Thread: 4, Time: 0.030000

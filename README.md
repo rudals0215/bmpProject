@@ -6,8 +6,26 @@
 - 최종 결과는 새로운 파일에 저장  
 - 실행 Thread 개수에 따른 수행 시간 비교  
 
+# Compilation
+```
+make
+```
+# Execution
+```
+./bmpMain.out <bitmap file path> <new file path> <Num of Thread>
+```
+## example
+```
+./bmpMain.out sample.bmp sample_new.bmp 4
+```
+
 # Before  
 ![before](sample.bmp)  
   
 # After  
-![after](sample_new.bmp)
+### Vertical
+![after](sample_vertical.bmp)  
+### Horizontal
+![after](sample_horizontal.bmp)  
+### Window-like
+![after](sample_window.bmp)
