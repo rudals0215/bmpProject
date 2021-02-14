@@ -16,15 +16,10 @@
 #include "bmpStruct.h"
 
 void divideSection(int index[][2], int width, int height, int numSection);
+void* func(void *arg);
 
-void* fun(void *arg);
-// void* funRed(void *arg);
-// void* funGreen(void *arg);
-// void* funBlue(void *arg);
-// void* funWhite(void *arg);
-
+#define BUF_MAX 100
 int THR_SIZE = 4;
-pthread_mutex_t lock;
 
 int main(int argc, char *argv[]){
     clock_t start, end;
@@ -33,13 +28,25 @@ int main(int argc, char *argv[]){
     int fd;
     int fdNew;
     int size, width, height, padding;
+    char filename[BUF_MAX];         // bitmap image file name
+    char newfilename[BUF_MAX];      // new bitmap image file name
     
     BITMAPFILEHEADER fh;
     BITMAPINFOHEADER ih;
     RGBTRIPLE * img;
 
+	if (argc != 4) {
+		printf("Usage : %s <bitmap file> <new file> <Num of Thread>\n", argv[0]); 
+		exit(1);	
+	}
+
+    // File Load
+    strcpy(filename, argv[1]);
+    strcpy(newfilename, argv[2]);
+    THR_SIZE = atoi(argv[3]);
+
     // Load a image
-    fd = open("sample.bmp", O_RDONLY);
+    fd = open(filename, O_RDONLY);
     if(fd == -1){
         perror("open fd");
         exit(1);
@@ -68,29 +75,24 @@ int main(int argc, char *argv[]){
     img = (RGBTRIPLE *)malloc(sizeof(RGBTRIPLE)*size);
     memcpy(img, addr + sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER), sizeof(RGBTRIPLE)*size);
 
-    for(int i=0;i<5;i++)
-        printf("img BGR[%d] : %u %u %u\n",i, img[i].rgbtBlue,img[i].rgbtGreen,img[i].rgbtRed);
-    
+    // Test
+    for(int i=0;i<5;i++){
+        int j = size - i;
+        printf("img BGR[%d] : %u %u %u\n",j, img[j].rgbtBlue,img[j].rgbtGreen,img[j].rgbtRed);
+    }
+
     // Modify through threads
     pthread_t t_id[THR_SIZE];
     cpu_set_t cpuset;
 
     int index[THR_SIZE][2]; // To divide sections
-    // int light[] = {50, 75, 25, 100}; // percentage to change light of bitmap images
-    int numLight[] = {0,1,2,3};
+    int numLight[] = {0,1,2,3}; // To select colors applied
     THREADARGS* param[THR_SIZE];
 
     divideSection(index, width, height, THR_SIZE);
 
-    void* (*func[4])(void *);
-    // func[0] = funRed;
-    // func[1] = funGreen;
-    // func[2] = funBlue;
-    // func[3] = funWhite;
-
     start = clock();
     for(int i=0;i<THR_SIZE;i++){
-        
         param[i] = (THREADARGS*) malloc(sizeof(THREADARGS));
         printf("## Thread %d ##\n",i);
         param[i]->start = index[i][0]; // start
@@ -98,11 +100,10 @@ int main(int argc, char *argv[]){
         param[i]->width = width;
         param[i]->img = img;            // img
         param[i]->numLight = numLight[i];
-        // param->light = light[i];     // light
 
         printf("In main, img: %p %d\n",param[i]->img, param[i]->start);
 
-	    if (pthread_create(&t_id[i], NULL, fun, (void*)param[i]) != 0){
+	    if (pthread_create(&t_id[i], NULL, func, (void*)param[i]) != 0){
             printf("pthread_create() error");
             exit(1);
 	    }
@@ -124,6 +125,8 @@ int main(int argc, char *argv[]){
             printf("pthread_join() error");
             exit(1);
         }
+        
+        free(param[i]);
     }
 
     end = clock();    
@@ -134,42 +137,33 @@ int main(int argc, char *argv[]){
     fclose(time);
 
     // Write a new image
-    fdNew = open("sample_new.bmp", O_WRONLY | O_CREAT | O_SYNC | O_TRUNC, S_IRUSR | S_IWUSR | S_IRWXG | S_IWGRP | S_IROTH);
+    fdNew = open(newfilename, O_WRONLY | O_CREAT | O_SYNC | O_TRUNC, S_IRUSR | S_IWUSR | S_IRWXG | S_IWGRP | S_IROTH);
     if(fdNew == -1){
         perror("open fdNew");
         exit(1);
     }
 
-    FILE * fpNew = fopen("sample_newtry.bmp", "w");
-    
-    fwrite(&fh, sizeof(unsigned char), sizeof(BITMAPFILEHEADER), fpNew);
-    fwrite(&ih, sizeof(unsigned char), sizeof(BITMAPINFOHEADER), fpNew);
-    fwrite(img, sizeof(unsigned char), sizeof(RGBTRIPLE)*width*height, fpNew);
-
-    // void * addrNew = mmap(NULL, buf.st_size, PROT_WRITE, MAP_SHARED, fdNew, 0);
-    // memcpy(addrNew, &fh, sizeof(BITMAPFILEHEADER));
-    // memcpy(addrNew + sizeof(BITMAPFILEHEADER), &ih, sizeof(BITMAPINFOHEADER));
-    // memcpy(addrNew + sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER), img, sizeof(RGBTRIPLE) * size);
-
+    write(fdNew, &fh, sizeof(BITMAPFILEHEADER));
+    write(fdNew, &ih, sizeof(BITMAPINFOHEADER));
+    write(fdNew, img, sizeof(RGBTRIPLE)*size);
     close(fdNew);
     free(img);
 
     munmap(addr, buf.st_size);
-    // munmap(addrNew, buf.st_size);
     return 0;
 }
 
-void* fun(void *arg){
+void* func(void *arg){
     THREADARGS* args = (THREADARGS*) arg;
     int start = args->start;
     int end = args->end;
     int width = args->width;
     RGBTRIPLE * img = args->img;
     
-    int startX = start / width;
-    int startY = start % width;
-    int endX = end / width;
-    int endY = end % width;
+    int startX = start % width;
+    int startY = start / width;
+    int endX = end % width;
+    int endY = end / width;
     printf("In Thread, %d[%d, %d]-> %d[%d, %d] img: %p, light: %d\n",start, startX, startY, end, endX, endY, args->img, args->numLight);
     printf("%d before BGR %u %u %u\n",args->numLight, img[start].rgbtBlue, img[start].rgbtGreen, img[start].rgbtRed);
 
@@ -180,28 +174,28 @@ void* fun(void *arg){
             int p = width*y+x;
             switch (args->numLight){
             case 0: 
-                img[p].rgbtRed += 50;
-                if(img[p].rgbtRed > 255) img[p].rgbtRed = 255;
+                if(img[p].rgbtRed < 155) img[p].rgbtRed += 100;
+                else img[p].rgbtRed = 255;
                 break;
             case 1:
-                img[p].rgbtBlue += 50;
-                if(img[p].rgbtBlue > 255) img[p].rgbtBlue = 255;
+                if(img[p].rgbtGreen < 155) img[p].rgbtGreen += 100;
+                else img[p].rgbtGreen = 255;
                 break;
             case 2:
-                img[p].rgbtGreen += 50;
-                if(img[p].rgbtGreen > 255) img[p].rgbtBlue = 255;
+                if(img[p].rgbtBlue < 155) img[p].rgbtBlue += 100;
+                else img[p].rgbtBlue = 255;
                 break;
-            default:
-                img[p].rgbtRed += 50;
-                if(img[p].rgbtRed > 255) img[p].rgbtRed = 255;
-                
-                img[p].rgbtGreen += 50;
-                if(img[p].rgbtGreen> 255) img[p].rgbtGreen = 255;
-                
-                img[p].rgbtBlue += 50;
-                if(img[p].rgbtBlue > 255) img[p].rgbtBlue = 255;
+            case 3:
+                if(img[p].rgbtRed < 155) img[p].rgbtRed += 100;
+                else img[p].rgbtRed = 255;
+                if(img[p].rgbtGreen < 155) img[p].rgbtGreen += 100;
+                else img[p].rgbtGreen = 255;
+                if(img[p].rgbtBlue < 155) img[p].rgbtBlue += 100;
+                else img[p].rgbtBlue = 255;
+            
                 break;
             }
+
         }   
     }
 
@@ -209,142 +203,26 @@ void* fun(void *arg){
 	return NULL;
 }
 
-
-// void* funRed(void *arg){
-//     THREADARGS* args = (THREADARGS*) arg;
-//     int start = args->start;
-//     int end = args->end;
-//     int width = args->width;
-//     RGBTRIPLE * img = args->img;
-    
-//     int startX = start / width;
-//     int startY = start % width;
-//     int endX = end / width;
-//     int endY = end % width;
-//     printf("In Thread, %d[%d, %d]-> %d[%d, %d] img: %p, light: Red\n",start, startX, startY, end, endX, endY, args->img);
-
-//     printf("before BGR %u %u %u\n",img[start].rgbtBlue, img[start].rgbtGreen, img[start].rgbtRed);
-
-//     for(int x=startX; x<=endX; x++){
-//         for(int y=startY; y<=endY; y++){
-//             // Change Light
-//             // printf("change light %d %d\n",x,y);
-//             int p = width*y+x;
-//             img[p].rgbtRed *= 2;
-//             if(img[p].rgbtRed > 255) img[p].rgbtRed = 255;
-//         }
-//     }
-
-//     printf("after BGR %u %u %u\n",img[start].rgbtBlue, img[start].rgbtGreen, img[start].rgbtRed);
-// 	return NULL;
-// }
-
-// void* funGreen(void *arg){
-//     THREADARGS* args = (THREADARGS*) arg;
-//     int start = args->start;
-//     int end = args->end;
-//     int width = args->width;
-//     RGBTRIPLE * img = args->img;
-    
-//     int startX = start / width;
-//     int startY = start % width;
-//     int endX = end / width;
-//     int endY = end % width;
-//     printf("In Thread, %d[%d, %d]-> %d[%d, %d] img: %p, light: Green\n",start, startX, startY, end, endX, endY, args->img);
-
-//     printf("before BGR %u %u %u\n",img[start].rgbtBlue, img[start].rgbtGreen, img[start].rgbtRed);
-
-//     for(int x=startX; x<=endX; x++){
-//         for(int y=startY; y<=endY; y++){
-//             // Change Light
-//             // printf("change light %d %d\n",x,y);
-//             int p = width*y+x;
-//             img[p].rgbtGreen *= 2;
-//             if(img[p].rgbtGreen > 255) img[p].rgbtGreen = 255;
-//         }
-//     }
-
-//     printf("after BGR %u %u %u\n",img[start].rgbtBlue, img[start].rgbtGreen, img[start].rgbtRed);
-// 	return NULL;
-// }
-
-// void* funBlue(void *arg){
-//     THREADARGS* args = (THREADARGS*) arg;
-//     int start = args->start;
-//     int end = args->end;
-//     int width = args->width;
-//     RGBTRIPLE * img = args->img;
-    
-//     int startX = start / width;
-//     int startY = start % width;
-//     int endX = end / width;
-//     int endY = end % width;
-//     printf("In Thread, %d[%d, %d]-> %d[%d, %d] img: %p, light: Blue\n",start, startX, startY, end, endX, endY, args->img);
-
-//     printf("before BGR %u %u %u\n",img[start].rgbtBlue, img[start].rgbtGreen, img[start].rgbtRed);
-
-//     for(int x=startX; x<=endX; x++){
-//         for(int y=startY; y<=endY; y++){
-//             // Change Light
-//             // printf("change light %d %d\n",x,y);
-//             int p = width*y+x;
-//             img[p].rgbtBlue += 100;
-//             if(img[p].rgbtBlue > 255) img[p].rgbtBlue = 255;
-//         }
-//     }
-
-//     printf("after BGR %u %u %u\n",img[start].rgbtBlue, img[start].rgbtGreen, img[start].rgbtRed);
-// 	return NULL;
-// }
-
-// void* funWhite(void *arg){
-//     THREADARGS* args = (THREADARGS*) arg;
-//     int start = args->start;
-//     int end = args->end;
-//     int width = args->width;
-//     RGBTRIPLE * img = args->img;
-    
-//     int startX = start / width;
-//     int startY = start % width;
-//     int endX = end / width;
-//     int endY = end % width;
-//     printf("In Thread, %d[%d, %d]-> %d[%d, %d] img: %p, light: White\n",start, startX, startY, end, endX, endY, args->img);
-
-//     printf("before BGR %u %u %u\n",img[start].rgbtBlue, img[start].rgbtGreen, img[start].rgbtRed);
-
-//     for(int x=startX; x<=endX; x++){
-//         for(int y=startY; y<=endY; y++){
-//             // Change Light
-//             // printf("change light %d %d\n",x,y);
-//             int p = width*y+x;
-//             img[p].rgbtRed *= 2;
-//             img[p].rgbtGreen *= 2;
-//             img[p].rgbtBlue *= 2;
-
-//             if(img[p].rgbtRed > 255) img[p].rgbtRed = 255;
-//             if(img[p].rgbtGreen > 255) img[p].rgbtGreen = 255;
-//             if(img[p].rgbtBlue > 255) img[p].rgbtBlue = 255;
-
-//         }
-//     }
-
-//     printf("after BGR %u %u %u\n",img[start].rgbtBlue, img[start].rgbtGreen, img[start].rgbtRed);
-// 	return NULL;
-// }
-
-
 void divideSection(int index[][2], int width, int height, int numSection){
     printf("divide Section %d\n", numSection);
     printf("width X height %d X %d\n", width, height);
 
-    for(int i=0 ; i < numSection ; i++){
-        int startX = width / numSection * i;
-        int startY = 0;
-        int endX = width / numSection * (i + 1) - 1;
-        int endY = height - 1;
+    for(int i=0 ; i < THR_SIZE ; i++){
+        // vertical division
+        // int startX = width / numSection * i;
+        // int endX = width / numSection * (i + 1) - 1;
+        // int startY = 0;
+        // int endY = height - 1;
 
-        index[i][0] = width*startX + startY;
-        index[i][1] = width*endX + endY;
+        // window-like division
+        numSection = 2;
+        int startX = width / numSection * (i%numSection);
+        int endX = width / numSection * (i%numSection + 1) - 1;
+        int startY = height / numSection * (i/numSection);
+        int endY = height / numSection * (i/numSection + 1) - 1;
+
+        index[i][0] = width*startY + startX;
+        index[i][1] = width*endY + endX;
         printf("Section %d: %d[%d,%d]-> %d[%d,%d]\n", i, index[i][0], startX, startY, index[i][1], endX, endY);
     }    
 }
