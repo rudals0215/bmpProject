@@ -13,13 +13,16 @@
 #include <errno.h>
 #include <string.h>
 #include <time.h>
+#include <math.h>
 #include "bmpStruct.h"
 
 void divideSection(int index[][2], int width, int height, int numSection);
 void* func(void *arg);
+double waste_time(long n);
 
+#define THREAD_MAX 4
 #define BUF_MAX 100
-int THR_SIZE = 4;
+int THREAD_SIZE;
 
 int main(int argc, char *argv[]){
     clock_t start, end;
@@ -43,7 +46,7 @@ int main(int argc, char *argv[]){
     // File Load
     strcpy(filename, argv[1]);
     strcpy(newfilename, argv[2]);
-    THR_SIZE = atoi(argv[3]);
+    THREAD_SIZE = atoi(argv[3]);
 
     // Load a image
     fd = open(filename, O_RDONLY);
@@ -75,65 +78,46 @@ int main(int argc, char *argv[]){
     img = (RGBTRIPLE *)malloc(sizeof(RGBTRIPLE)*size);
     memcpy(img, addr + sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER), sizeof(RGBTRIPLE)*size);
 
-    // Test
-    for(int i=0;i<5;i++){
-        int j = size - i;
-        printf("img BGR[%d] : %u %u %u\n",j, img[j].rgbtBlue,img[j].rgbtGreen,img[j].rgbtRed);
-    }
-
     // Modify through threads
-    pthread_t t_id[THR_SIZE];
-    cpu_set_t cpuset;
+    pthread_t t_id[THREAD_SIZE];
 
-    int index[THR_SIZE][2]; // To divide sections
+    int index[THREAD_SIZE][2]; // To divide sections
     int numLight[] = {0,1,2,3}; // To select colors applied
-    THREADARGS* param[THR_SIZE];
+    THREADARGS* param[THREAD_SIZE];
 
-    divideSection(index, width, height, THR_SIZE);
+    divideSection(index, width, height, THREAD_SIZE);
 
-    start = clock();
-    for(int i=0;i<THR_SIZE;i++){
+    for(int i=0;i<THREAD_MAX;i++){
         param[i] = (THREADARGS*) malloc(sizeof(THREADARGS));
         printf("## Thread %d ##\n",i);
         param[i]->start = index[i][0]; // start
         param[i]->end = index[i][1];   // end
         param[i]->width = width;
         param[i]->img = img;            // img
-        param[i]->numLight = numLight[i];
+        param[i]->numLight = (numLight[i] % THREAD_SIZE);
 
         printf("In main, img: %p %d\n",param[i]->img, param[i]->start);
-
-	    if (pthread_create(&t_id[i], NULL, func, (void*)param[i]) != 0){
+    }
+    start = clock();
+    for(int i=0;i<THREAD_SIZE;i++){
+        if (pthread_create(&t_id[i], NULL, func, (void*)param[i]) != 0){
             printf("pthread_create() error");
             exit(1);
 	    }
-
-        // set the thread affinity
-        CPU_ZERO(&cpuset);
-        CPU_SET(i, &cpuset);
-        pthread_setaffinity_np(t_id[i], sizeof(cpuset), &cpuset);
-
-        // Thread Affinity Check
-        pthread_getaffinity_np(t_id[i], sizeof(cpuset), &cpuset);
-        for (int j = 0; j < 4; j++)
-            if (CPU_ISSET(j, &cpuset))
-                printf("\t CPU %d\n", j);
     }
-    
-    for(int i=0;i<THR_SIZE;i++){
-	    if(pthread_join(t_id[i], NULL)!=0){
+
+    for(int i=0;i<THREAD_SIZE;i++){
+        if(pthread_join(t_id[i], NULL)!=0){
             printf("pthread_join() error");
             exit(1);
         }
-        
         free(param[i]);
     }
-
     end = clock();    
 	res = (float)(end - start)/CLOCKS_PER_SEC;
     printf("Executed time: %f\n", res);
     FILE * time = fopen("time.txt","at");
-    fprintf(time, "Thread: %d, Time: %f\n", THR_SIZE, res);
+    fprintf(time, "Thread: %d, Time: %f\n", THREAD_SIZE, res);
     fclose(time);
 
     // Write a new image
@@ -167,10 +151,19 @@ void* func(void *arg){
     printf("In Thread, %d[%d, %d]-> %d[%d, %d] img: %p, light: %d\n",start, startX, startY, end, endX, endY, args->img, args->numLight);
     printf("%d before BGR %u %u %u\n",args->numLight, img[start].rgbtBlue, img[start].rgbtGreen, img[start].rgbtRed);
 
+    unsigned long mask = 1;
+    mask = mask << (args->numLight);
+    printf("mask : %lu\n", mask);
+
+    if(pthread_setaffinity_np(pthread_self(), sizeof(mask), (cpu_set_t *)&mask) < 0){
+        perror("pthread_setaffinity_np");
+    }
+    waste_time(1000);
+    //printf("--------------- waste time ---------------\n");
+
     for(int x=startX; x<=endX; x++){
         for(int y=startY; y<=endY; y++){
             // Change Light
-            // printf("change light %d %d\n",x,y);
             int p = width*y+x;
             switch (args->numLight){
             case 0: 
@@ -204,27 +197,69 @@ void* func(void *arg){
 }
 
 void divideSection(int index[][2], int width, int height, int numSection){
-    printf("divide Section %d\n", numSection);
-    printf("width X height %d X %d\n", width, height);
+    printf("divide Section = %d\n", numSection);
+    printf("width X height = %d X %d\n", width, height);
 
-    for(int i=0 ; i < THR_SIZE ; i++){
-        // vertical division
-        // int startX = width / numSection * i;
-        // int endX = width / numSection * (i + 1) - 1;
-        // int startY = 0;
-        // int endY = height - 1;
+    for(int i=0 ; i < THREAD_SIZE ; i++){
+        // Horizontal division
+        int startX = 0;
+        int endX = width - 1;
+        int startY = height / numSection * (i % numSection);
+        int endY = (height / numSection * ((i % numSection) + 1)) - 1;
 
-        // window-like division
-        numSection = 2;
-        int startX = width / numSection * (i%numSection);
-        int endX = width / numSection * (i%numSection + 1) - 1;
-        int startY = height / numSection * (i/numSection);
-        int endY = height / numSection * (i/numSection + 1) - 1;
-
-        index[i][0] = width*startY + startX;
-        index[i][1] = width*endY + endX;
+        index[i][0] = width * startY + startX;
+        index[i][1] = width * endY + endX;
         printf("Section %d: %d[%d,%d]-> %d[%d,%d]\n", i, index[i][0], startX, startY, index[i][1], endX, endY);
-    }    
+    }
+    // for (int i = 0; i < THREAD_MAX; i++) {
+    //     // window-like division
+    //     numSection = 2;
+    //     int startX = width / numSection * (i % numSection);
+    //     int endX = width / numSection * ((i % numSection) + 1) - 1;
+    //     int startY = height / numSection * (i / numSection);
+    //     int endY = height / numSection * ((i / numSection) + 1) - 1;
+
+    //     index[i][0] = width * startY + startX;
+    //     index[i][1] = width * endY + endX;
+    //     printf("Section %d: %d[%d,%d]-> %d[%d,%d]\n", i, index[i][0], startX, startY, index[i][1], endX, endY);
+    // }
+
+    // if(numSection == 4){
+    //     for(int i=0 ; i < THREAD_SIZE ; i++){
+    //         // window-like division
+    //         numSection = 2;
+    //         int startX = width / numSection * (i%numSection);
+    //         int endX = width / numSection * ((i % numSection) + 1) - 1;
+    //         int startY = height / numSection * (i / numSection);
+    //         int endY = height / numSection * ((i / numSection) + 1) - 1;
+
+    //         index[i][0] = width*startY + startX;
+    //         index[i][1] = width*endY + endX;
+    //         printf("Section %d: %d[%d,%d]-> %d[%d,%d]\n", i, index[i][0], startX, startY, index[i][1], endX, endY);
+    //     }    
+    // }else {
+    //     for(int i=0 ; i < THREAD_SIZE ; i++){
+    //         // window-like division
+    //         int startX = 0;
+    //         int endX = width - 1;
+    //         int startY = height/ numSection * (i%numSection);
+    //         int endY = (height / numSection * ((i % numSection) + 1)) - 1;
+
+    //         index[i][0] = width*startY + startX;
+    //         index[i][1] = width*endY + endX;
+    //         printf("Section %d: %d[%d,%d]-> %d[%d,%d]\n", i, index[i][0], startX, startY, index[i][1], endX, endY);
+    //     }  
+    // }
+    
 }
 
     
+double waste_time(long n){
+    double res = 0;
+    long i = 0;
+    while(i < n * 200000){
+        i++;
+        res += sqrt(i);
+    }
+    return res;
+}

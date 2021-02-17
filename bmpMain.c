@@ -87,12 +87,12 @@ int main(int argc, char *argv[]){
     start = clock();
     for(int i=0;i<THR_SIZE;i++){
         printf("## Thread %d ##\n",i);
-        param->startX = index[i][0]; // startX
-        param->startY = index[i][1]; // startY
-        param->endX = index[i][2];   // endX
-        param->endY = index[i][3];   // endY
-        param->img = img;            // img
-        param->light = light[i];     // light
+        // param->startX = index[i][0]; // startX
+        // param->startY = index[i][1]; // startY
+        // param->endX = index[i][2];   // endX
+        // param->endY = index[i][3];   // endY
+        // param->img = img;            // img
+        // param->light = light[i];     // light
 
         // printf("In main, img: %p %u\n",param->img, param->img[0][0].rgbtBlue);
 
