@@ -22,6 +22,7 @@ and then execute a python file to create a chart image to compare the time taken
 you need to activate a virtual environment before executing chart.py.
 ```
 . venv/bin/activate
+pip3 install matplotlib
 python3 chart.py
 ```
 
