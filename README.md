@@ -12,20 +12,35 @@ make
 ```
 # Execution
 ```
+./auto.out
+```
+or
+```
 ./bmpMain.out <bitmap file path> <new file path> <Num of Thread>
 ```
+and then execute a python file to create a chart image to compare the time taken by the number of threads used.
+you need to activate a virtual environment before executing chart.py.
+```
+. venv/bin/activate
+python3 chart.py
+```
+
 ## example
 ```
 ./bmpMain.out sample.bmp sample_new.bmp 4
 ```
 
-# Before  
+# Result
+## Before  
 ![before](sample.bmp)  
   
-# After  
+## After  
 ### Vertical
 ![after](sample_vertical.bmp)  
 ### Horizontal
 ![after](sample_horizontal.bmp)  
 ### Window-like
 ![after](sample_window.bmp)
+
+## Execution time  
+![timeChart](chart.jpg)  

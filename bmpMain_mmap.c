@@ -13,12 +13,10 @@
 #include <errno.h>
 #include <string.h>
 #include <time.h>
-#include <math.h>
 #include "bmpStruct.h"
 
-void divideSection(int index[][2], int width, int height, int numSection);
+void divideSection(int index[][2], int width, int height, int numSection, int how);
 void* func(void *arg);
-double waste_time(long n);
 
 #define THREAD_MAX 4
 #define BUF_MAX 100
@@ -43,10 +41,15 @@ int main(int argc, char *argv[]){
 		exit(1);	
 	}
 
-    // File Load
+    // load the filename and thread size
     strcpy(filename, argv[1]);
     strcpy(newfilename, argv[2]);
     THREAD_SIZE = atoi(argv[3]);
+
+    if(THREAD_SIZE > THREAD_MAX){
+        printf("Thread size is more than maximum\n");
+        exit(1);
+    }
 
     // Load a image
     fd = open(filename, O_RDONLY);
@@ -82,12 +85,12 @@ int main(int argc, char *argv[]){
     pthread_t t_id[THREAD_SIZE];
 
     int index[THREAD_SIZE][2]; // To divide sections
-    int numLight[] = {0,1,2,3}; // To select colors applied
+    int numLight[] = {0,1,2,3}; // To select colors to apply
     THREADARGS* param[THREAD_SIZE];
 
-    divideSection(index, width, height, THREAD_SIZE);
+    divideSection(index, width, height, THREAD_SIZE, 1);
 
-    for(int i=0;i<THREAD_MAX;i++){
+    for(int i=0;i<THREAD_SIZE;i++){
         param[i] = (THREADARGS*) malloc(sizeof(THREADARGS));
         printf("## Thread %d ##\n",i);
         param[i]->start = index[i][0]; // start
@@ -116,8 +119,10 @@ int main(int argc, char *argv[]){
     end = clock();    
 	res = (float)(end - start)/CLOCKS_PER_SEC;
     printf("Executed time: %f\n", res);
-    FILE * time = fopen("time.txt","at");
-    fprintf(time, "Thread: %d, Time: %f\n", THREAD_SIZE, res);
+
+    // Save the time table
+    FILE * time = fopen("time.csv","at");
+    fprintf(time, "%d, %f\n", THREAD_SIZE, res);
     fclose(time);
 
     // Write a new image
@@ -158,8 +163,6 @@ void* func(void *arg){
     if(pthread_setaffinity_np(pthread_self(), sizeof(mask), (cpu_set_t *)&mask) < 0){
         perror("pthread_setaffinity_np");
     }
-    waste_time(1000);
-    //printf("--------------- waste time ---------------\n");
 
     for(int x=startX; x<=endX; x++){
         for(int y=startY; y<=endY; y++){
@@ -188,78 +191,51 @@ void* func(void *arg){
             
                 break;
             }
-
-        }   
+        }  
     }
 
     printf("%d after BGR %u %u %u\n",args->numLight, img[start].rgbtBlue, img[start].rgbtGreen, img[start].rgbtRed);
 	return NULL;
 }
 
-void divideSection(int index[][2], int width, int height, int numSection){
+void divideSection(int index[][2], int width, int height, int numSection, int how){
     printf("divide Section = %d\n", numSection);
     printf("width X height = %d X %d\n", width, height);
 
     for(int i=0 ; i < THREAD_SIZE ; i++){
-        // Horizontal division
-        int startX = 0;
-        int endX = width - 1;
-        int startY = height / numSection * (i % numSection);
-        int endY = (height / numSection * ((i % numSection) + 1)) - 1;
+        int startX,endX,startY,endY;
+        switch(how){
+            case 0:
+            // Horizontal division
+            startX = 0;
+            endX = width - 1;
+            startY = height / numSection * (i % numSection);
+            endY = (height / numSection * ((i % numSection) + 1)) - 1;
+            break;
+            
+            case 1:
+            // vertical division
+            startX = width / numSection * i;
+            endX = width / numSection * (i + 1) - 1;
+            startY = 0;
+            endY = height - 1;
+            break;
+            
+            default:
+            break;
+        }
+
+        // window-like division
+        // numSection = 2;
+        // int startX = width / numSection * (i%numSection);
+        // int endX = width / numSection * (i%numSection + 1) - 1;
+        // int startY = height / numSection * (i/numSection);
+        // int endY = height / numSection * (i/numSection + 1) - 1;
+        
 
         index[i][0] = width * startY + startX;
         index[i][1] = width * endY + endX;
         printf("Section %d: %d[%d,%d]-> %d[%d,%d]\n", i, index[i][0], startX, startY, index[i][1], endX, endY);
     }
-    // for (int i = 0; i < THREAD_MAX; i++) {
-    //     // window-like division
-    //     numSection = 2;
-    //     int startX = width / numSection * (i % numSection);
-    //     int endX = width / numSection * ((i % numSection) + 1) - 1;
-    //     int startY = height / numSection * (i / numSection);
-    //     int endY = height / numSection * ((i / numSection) + 1) - 1;
-
-    //     index[i][0] = width * startY + startX;
-    //     index[i][1] = width * endY + endX;
-    //     printf("Section %d: %d[%d,%d]-> %d[%d,%d]\n", i, index[i][0], startX, startY, index[i][1], endX, endY);
-    // }
-
-    // if(numSection == 4){
-    //     for(int i=0 ; i < THREAD_SIZE ; i++){
-    //         // window-like division
-    //         numSection = 2;
-    //         int startX = width / numSection * (i%numSection);
-    //         int endX = width / numSection * ((i % numSection) + 1) - 1;
-    //         int startY = height / numSection * (i / numSection);
-    //         int endY = height / numSection * ((i / numSection) + 1) - 1;
-
-    //         index[i][0] = width*startY + startX;
-    //         index[i][1] = width*endY + endX;
-    //         printf("Section %d: %d[%d,%d]-> %d[%d,%d]\n", i, index[i][0], startX, startY, index[i][1], endX, endY);
-    //     }    
-    // }else {
-    //     for(int i=0 ; i < THREAD_SIZE ; i++){
-    //         // window-like division
-    //         int startX = 0;
-    //         int endX = width - 1;
-    //         int startY = height/ numSection * (i%numSection);
-    //         int endY = (height / numSection * ((i % numSection) + 1)) - 1;
-
-    //         index[i][0] = width*startY + startX;
-    //         index[i][1] = width*endY + endX;
-    //         printf("Section %d: %d[%d,%d]-> %d[%d,%d]\n", i, index[i][0], startX, startY, index[i][1], endX, endY);
-    //     }  
-    // }
     
-}
-
-    
-double waste_time(long n){
-    double res = 0;
-    long i = 0;
-    while(i < n * 200000){
-        i++;
-        res += sqrt(i);
-    }
-    return res;
 }
