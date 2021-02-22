@@ -42,4 +42,5 @@ typedef struct _THREADARGS
     int width;
     RGBTRIPLE* img;
     int numLight;
+    int CPU;
 } THREADARGS;

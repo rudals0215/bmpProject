@@ -86,6 +86,7 @@ int main(int argc, char *argv[]){
 
     int index[THREAD_SIZE][2]; // To divide sections
     int numLight[] = {0,1,2,3}; // To select colors to apply
+    int CPU[] = {0,1,2,3}; // To select CPU affinity
     THREADARGS* param[THREAD_SIZE];
 
     divideSection(index, width, height, THREAD_SIZE, 1);
@@ -98,6 +99,7 @@ int main(int argc, char *argv[]){
         param[i]->width = width;
         param[i]->img = img;            // img
         param[i]->numLight = (numLight[i] % THREAD_SIZE);
+        param[i]->CPU = (CPU[i] % THREAD_SIZE);
 
         printf("In main, img: %p %d\n",param[i]->img, param[i]->start);
     }
@@ -155,9 +157,10 @@ void* func(void *arg){
     int endY = end / width;
     printf("In Thread, %d[%d, %d]-> %d[%d, %d] img: %p, light: %d\n",start, startX, startY, end, endX, endY, args->img, args->numLight);
     printf("%d before BGR %u %u %u\n",args->numLight, img[start].rgbtBlue, img[start].rgbtGreen, img[start].rgbtRed);
+    printf("CPU %d\n",args->CPU);
 
     unsigned long mask = 1;
-    mask = mask << (args->numLight);
+    mask = mask << (args->CPU);
     printf("mask : %lu\n", mask);
 
     if(pthread_setaffinity_np(pthread_self(), sizeof(mask), (cpu_set_t *)&mask) < 0){
