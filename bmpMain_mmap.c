@@ -34,7 +34,7 @@ int main(int argc, char *argv[]){
     
     BITMAPFILEHEADER fh;
     BITMAPINFOHEADER ih;
-    RGBTRIPLE * img;
+    RGBTRIPLE ** img;
 
 	if (argc != 4) {
 		printf("Usage : %s <bitmap file> <new file> <Num of Thread>\n", argv[0]); 
@@ -78,8 +78,15 @@ int main(int argc, char *argv[]){
     height = ih.biHeight;
     size = width*height;
 
-    img = (RGBTRIPLE *)malloc(sizeof(RGBTRIPLE)*size);
-    memcpy(img, addr + sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER), sizeof(RGBTRIPLE)*size);
+    img = (RGBTRIPLE **)malloc(sizeof(RGBTRIPLE *) * THREAD_SIZE);
+    for(int i=0;i<THREAD_SIZE;i++){
+        img[i] = (RGBTRIPLE *)malloc(sizeof(RGBTRIPLE) * (size/THREAD_SIZE));
+    }
+
+    for(int i=0;i<THREAD_SIZE;i++){
+        memcpy(img[i], addr + sizeof(BITMAPFILEHEADER)+sizeof(BITMAPINFOHEADER) + (size/THREAD_SIZE*i), sizeof(RGBTRIPLE) * size / THREAD_SIZE);
+        printf("--->>  %p to %ld\n", addr + sizeof(BITMAPFILEHEADER)+sizeof(BITMAPINFOHEADER) + (size/THREAD_SIZE*i), sizeof(RGBTRIPLE) * size / THREAD_SIZE);
+    }
 
     // Modify through threads
     pthread_t t_id[THREAD_SIZE];
@@ -89,7 +96,7 @@ int main(int argc, char *argv[]){
     int CPU[] = {0,1,2,3}; // To select CPU affinity
     THREADARGS* param[THREAD_SIZE];
 
-    divideSection(index, width, height, THREAD_SIZE, 1);
+    divideSection(index, width, height, THREAD_SIZE, 1); // Horizontal division(0), Vertical division(1)
 
     for(int i=0;i<THREAD_SIZE;i++){
         param[i] = (THREADARGS*) malloc(sizeof(THREADARGS));
@@ -138,6 +145,9 @@ int main(int argc, char *argv[]){
     write(fdNew, &ih, sizeof(BITMAPINFOHEADER));
     write(fdNew, img, sizeof(RGBTRIPLE)*size);
     close(fdNew);
+    // for(int i=0;i<THREAD_SIZE;i++){
+    //     free(img[i]);
+    // }
     free(img);
 
     munmap(addr, buf.st_size);
@@ -149,18 +159,19 @@ void* func(void *arg){
     int start = args->start;
     int end = args->end;
     int width = args->width;
-    RGBTRIPLE * img = args->img;
+    int CPU = args->CPU;
+    RGBTRIPLE ** img = args->img;
     
     int startX = start % width;
     int startY = start / width;
     int endX = end % width;
     int endY = end / width;
-    printf("In Thread, %d[%d, %d]-> %d[%d, %d] img: %p, light: %d\n",start, startX, startY, end, endX, endY, args->img, args->numLight);
-    printf("%d before BGR %u %u %u\n",args->numLight, img[start].rgbtBlue, img[start].rgbtGreen, img[start].rgbtRed);
+    printf("In Thread, %d[%d, %d]-> %d[%d, %d] img: %p, light: %d\n",start, startX, startY, end, endX, endY, img[CPU], args->numLight);
+    printf("%d before BGR %u %u %u\n",args->numLight, img[CPU][start].rgbtBlue, img[CPU][start].rgbtGreen, img[CPU][start].rgbtRed);
     printf("CPU %d\n",args->CPU);
 
     unsigned long mask = 1;
-    mask = mask << (args->CPU);
+    mask = mask << (args->CPU); // To select CPU with mask (cpu0 - cpu3)
     printf("mask : %lu\n", mask);
 
     if(pthread_setaffinity_np(pthread_self(), sizeof(mask), (cpu_set_t *)&mask) < 0){
@@ -170,34 +181,34 @@ void* func(void *arg){
     for(int x=startX; x<=endX; x++){
         for(int y=startY; y<=endY; y++){
             // Change Light
-            int p = width*y+x;
+            int p = x;
             switch (args->numLight){
             case 0: 
-                if(img[p].rgbtRed < 155) img[p].rgbtRed += 100;
-                else img[p].rgbtRed = 255;
+                if(img[CPU][p].rgbtRed < 155) img[CPU][p].rgbtRed += 100;
+                else img[CPU][p].rgbtRed = 255;
                 break;
             case 1:
-                if(img[p].rgbtGreen < 155) img[p].rgbtGreen += 100;
-                else img[p].rgbtGreen = 255;
+                if(img[CPU][p].rgbtGreen < 155) img[CPU][p].rgbtGreen += 100;
+                else img[CPU][p].rgbtGreen = 255;
                 break;
             case 2:
-                if(img[p].rgbtBlue < 155) img[p].rgbtBlue += 100;
-                else img[p].rgbtBlue = 255;
+                if(img[CPU][p].rgbtBlue < 155) img[CPU][p].rgbtBlue += 100;
+                else img[CPU][p].rgbtBlue = 255;
                 break;
             case 3:
-                if(img[p].rgbtRed < 155) img[p].rgbtRed += 100;
-                else img[p].rgbtRed = 255;
-                if(img[p].rgbtGreen < 155) img[p].rgbtGreen += 100;
-                else img[p].rgbtGreen = 255;
-                if(img[p].rgbtBlue < 155) img[p].rgbtBlue += 100;
-                else img[p].rgbtBlue = 255;
+                if(img[CPU][p].rgbtRed < 155) img[CPU][p].rgbtRed += 100;
+                else img[CPU][p].rgbtRed = 255;
+                if(img[CPU][p].rgbtGreen < 155) img[CPU][p].rgbtGreen += 100;
+                else img[CPU][p].rgbtGreen = 255;
+                if(img[CPU][p].rgbtBlue < 155) img[CPU][p].rgbtBlue += 100;
+                else img[CPU][p].rgbtBlue = 255;
             
                 break;
             }
         }  
     }
 
-    printf("%d after BGR %u %u %u\n",args->numLight, img[start].rgbtBlue, img[start].rgbtGreen, img[start].rgbtRed);
+    printf("%d after BGR %u %u %u\n",args->numLight, img[CPU][start].rgbtBlue, img[CPU][start].rgbtGreen, img[CPU][start].rgbtRed);
 	return NULL;
 }
 
@@ -217,7 +228,7 @@ void divideSection(int index[][2], int width, int height, int numSection, int ho
             break;
             
             case 1:
-            // vertical division
+            // Vertical division
             startX = width / numSection * i;
             endX = width / numSection * (i + 1) - 1;
             startY = 0;

@@ -40,7 +40,7 @@ typedef struct _THREADARGS
     int start;
     int end;
     int width;
-    RGBTRIPLE* img;
+    RGBTRIPLE** img;
     int numLight;
     int CPU;
 } THREADARGS;
